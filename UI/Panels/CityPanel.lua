@@ -17,6 +17,10 @@ include( "ToolTipHelper" );
 local m_debugAllowMultiPanel	:boolean = false;		-- (false default) Let's multiple sub-panels show at one time.
 
 
+function round(num, idp)
+  local mult = 10^(idp or 0)
+  return math.floor(num * mult + 0.5) / mult
+end
 -- ===========================================================================
 --	CONSTANTS
 -- ===========================================================================
@@ -274,7 +278,11 @@ function ViewMain( data:table )
 	m_primaryColor, m_secondaryColor  = UI.GetPlayerColors( m_pPlayer:GetID() );
 	local darkerBackColor = DarkenLightenColor(m_primaryColor,(-85),100);
 	local brighterBackColor = DarkenLightenColor(m_primaryColor,90,255);
-
+	
+	
+	
+	local selectedCity	= UI.GetHeadSelectedCity();
+	
 	-- Name data
 	Controls.CityName:SetText((data.IsCapital and "[ICON_Capital]" or "") .. Locale.ToUpper( Locale.Lookup(data.CityName)));
 	Controls.CityName:SetToolTipString(data.IsCapital and Locale.Lookup("LOC_HUD_CITY_IS_CAPITAL") or nil );
@@ -325,7 +333,23 @@ function ViewMain( data:table )
 
 	-- Set icons and values for the yield checkboxes
 	Controls.CultureCheck:GetTextButton():SetText(		"[ICON_Culture]"	..toPlusMinusString(data.CulturePerTurn) );
-	Controls.FoodCheck:GetTextButton():SetText(			"[ICON_Food]"		..toPlusMinusString(data.FoodPerTurn) );
+	
+	local iModifiedFood;
+	local totalFood :number;
+	if data.TurnsUntilGrowth > -1 then
+		local growthModifier =  math.max(1 + (data.HappinessGrowthModifier/100) + data.OtherGrowthModifiers, 0); -- This is unintuitive but it's in parity with the logic in City_Growth.cpp
+		iModifiedFood = Round(data.FoodSurplus * growthModifier, 2);
+		totalFood = iModifiedFood * data.HousingMultiplier;
+		if data.Occupied then
+			totalFood = iModifiedFood * data.OccupationMultiplier;
+		end
+	else
+		iModifiedFood = data.FoodSurplus;
+		totalFood = iModifiedFood;		
+	end
+	local totalString:string = "[ICON_Food]"..toPlusMinusString(totalFood);
+	Controls.FoodCheck:GetTextButton():SetText(totalString);
+	
 	Controls.ProductionCheck:GetTextButton():SetText(	"[ICON_Production]"	..toPlusMinusString(data.ProductionPerTurn) );
 	Controls.ScienceCheck:GetTextButton():SetText(		"[ICON_Science]"	..toPlusMinusString(data.SciencePerTurn) );
 	Controls.FaithCheck:GetTextButton():SetText(		"[ICON_Faith]"		..toPlusMinusString(data.FaithPerTurn) );
@@ -334,7 +358,23 @@ function ViewMain( data:table )
 	-- Set the Yield checkboxes based on the game state
 	RealizeYield3WayCheck( data.YieldFilters[YieldTypes.CULTURE], YieldTypes.CULTURE, data.CulturePerTurnToolTip);
 	RealizeYield3WayCheck( data.YieldFilters[YieldTypes.FAITH], YieldTypes.FAITH, data.FaithPerTurnToolTip);
-	RealizeYield3WayCheck( data.YieldFilters[YieldTypes.FOOD], YieldTypes.FOOD, data.FoodPerTurnToolTip);
+	
+	local realFoodPerTurnToolTip = data.FoodPerTurnToolTip;
+	realFoodPerTurnToolTip = realFoodPerTurnToolTip.."[NEWLINE][NEWLINE]"..toPlusMinusString(-(data.FoodPerTurn - data.FoodSurplus)).." from Population"
+	
+	local happinessGrowthBonusString = Locale.Lookup("LOC_HUD_CITY_HAPPINESS_GROWTH_BONUS")
+	local iHappinessPercent = data.HappinessGrowthModifier;
+	realFoodPerTurnToolTip = realFoodPerTurnToolTip.."[NEWLINE]---------------------[NEWLINE]"..toPlusMinusString(Round(iHappinessPercent, 0)) .. "% "..happinessGrowthBonusString
+	
+	local OtherGrowthBonusString = Locale.Lookup("LOC_HUD_CITY_OTHER_GROWTH_BONUSES")
+	local iOtherGrowthPercent = data.OtherGrowthModifiers * 100;
+	realFoodPerTurnToolTip = realFoodPerTurnToolTip.."[NEWLINE]"..toPlusMinusString(Round(iOtherGrowthPercent, 0)) .. "% "..OtherGrowthBonusString
+	realFoodPerTurnToolTip = realFoodPerTurnToolTip.."[NEWLINE]".."x"..Locale.ToNumber( data.HousingMultiplier).." "..Locale.Lookup("LOC_HUD_CITY_HOUSING_MULTIPLIER")
+	if data.Occupied then
+		realFoodPerTurnToolTip = realFoodPerTurnToolTip.."[NEWLINE]".."x"..data.OccupationMultiplier..Locale.Lookup("LOC_HUD_CITY_OCCUPATION_MULTIPLIER")
+	end
+	
+	RealizeYield3WayCheck( data.YieldFilters[YieldTypes.FOOD], YieldTypes.FOOD, realFoodPerTurnToolTip);
 	RealizeYield3WayCheck( data.YieldFilters[YieldTypes.GOLD], YieldTypes.GOLD, data.GoldPerTurnToolTip);
 	RealizeYield3WayCheck( data.YieldFilters[YieldTypes.PRODUCTION], YieldTypes.PRODUCTION, data.ProductionPerTurnToolTip);
 	RealizeYield3WayCheck( data.YieldFilters[YieldTypes.SCIENCE], YieldTypes.SCIENCE, data.SciencePerTurnToolTip);
@@ -360,10 +400,77 @@ function ViewMain( data:table )
 		local iconName		:string = "ICON_" .. kReligion.ReligionType;
 		Controls.ReligionIcon:SetIcon(iconName);
 	end
+	
+	if ((table.count(data.Religions) > 0) or (data.PantheonBelief > -1)) then
+		local ReligionTooltip :string = "Your Pantheon[NEWLINE][NEWLINE]";
+		if data.PantheonBelief > -1 then
+			local kPantheonBelief = GameInfo.Beliefs[data.PantheonBelief];
+			ReligionTooltip = ReligionTooltip..Locale.Lookup(kPantheonBelief.Name).."[NEWLINE]"..Locale.Lookup(kPantheonBelief.Description);
+		end
+		if (table.count(data.Religions) > 0) then
+			local religiousMinorities = ""
+			local religiousMinoritiesExist = false;
+			for _,religion in ipairs(data.Religions) do	
+				local religionName	:string = Game.GetReligion():GetName(religion.ID);
+				local iconName		:string = "ICON_" .. religion.ReligionType;
+				
+				if religion == data.Religions[DATA_DOMINANT_RELIGION] then
+					ReligionTooltip = ReligionTooltip.."[NEWLINE]---------------------[NEWLINE]"..religionName..": "..religion.Followers.." Followers";
+				else
+					if ( religion.ID > -1 and religion.Followers > 0) then 
+						religiousMinoritiesExist = true;
+						religiousMinorities = religiousMinorities.. "[NEWLINE]"..religionName..": "..religion.Followers.." Followers";
+					end
+				end
+			end
+			for _, beliefIndex in ipairs(data.BeliefsOfDominantReligion) do
+				local kBelief			:table = GameInfo.Beliefs[beliefIndex];
+				ReligionTooltip = ReligionTooltip.."[NEWLINE][NEWLINE]"..Locale.Lookup(kBelief.Name).."[NEWLINE]"..Locale.Lookup(kBelief.Description)
+			end
+			if religiousMinoritiesExist then
+				ReligionTooltip = ReligionTooltip.."[NEWLINE]---------------------[NEWLINE]Religious Minorities[NEWLINE]"..religiousMinorities;
+			end
+		end
+		Controls.ReligionGrid:SetToolTipString(ReligionTooltip);
+	else
+		Controls.ReligionGrid:SetToolTipString("This city has no religion.")
+	end
 
+	
+	Controls.BreakdownNum:SetText( data.DistrictsNum.."/"..data.DistrictsPossibleNum );
+	Controls.BreakdownLabel:SetText("DISTRICTS");
+	
+	local DistrictTooltip = "";
+	local CityCenter = true;
+	for _, district in ipairs(data.BuildingsAndDistricts) do
+		if district.isBuilt then
+			local districtName = district.Name;
+			if district.isPillaged then
+				districtName = districtName .. " [COLOR:StatBadCS](Pillaged)[ENDCOLOR]"
+			end
+			if ( CityCenter ) then
+				DistrictTooltip = DistrictTooltip..""..districtName;
+				CityCenter = false;
+			else
+				DistrictTooltip = DistrictTooltip.."[NEWLINE]"..districtName;
+			end
+			--district.YieldBonus
+			for _,building in ipairs(district.Buildings) do
+				if building.isBuilt then
+					local buildingName = building.Name;
+					if building.isPillaged then
+						buildingName = buildingName .. " [COLOR:StatBadCS](Pillaged)[ENDCOLOR]"
+					end
+					DistrictTooltip = DistrictTooltip.."[NEWLINE]".."[ICON_BULLET]"..buildingName;
+				end
+			end
+		end
+	end
 
-	Controls.BreakdownNum:SetText( data.BuildingsNum );
-
+	
+	
+	Controls.BreakdownGrid:SetToolTipString(DistrictTooltip);
+	
 	local amenitiesNumText = data.AmenitiesNetAmount;
 	if (data.AmenitiesNetAmount > 0) then
 		amenitiesNumText = "+" .. amenitiesNumText;
@@ -371,17 +478,137 @@ function ViewMain( data:table )
 	Controls.AmenitiesNum:SetText( amenitiesNumText );
 	local colorName:string = GetHappinessColor( data.Happiness );
 	Controls.AmenitiesNum:SetColorByName( colorName );
-
+	
+	local HappinessTooltipString = "";
+	HappinessTooltipString = Locale.Lookup(GameInfo.Happinesses[data.Happiness].Name);
+	if data.HappinessGrowthModifier == 0 then
+		HappinessTooltipString = HappinessTooltipString.."[NEWLINE][NEWLINE]---------------------";
+	else
+		local iGrowthPercent = Round(1 + (data.HappinessGrowthModifier/100), 2);
+		local iYieldPercent = Round(1 + (data.HappinessNonFoodYieldModifier/100), 2);
+		local growthInfo:string = 
+			GetColorPercentString(iGrowthPercent) .. 
+			" "..
+			Locale.Lookup("LOC_HUD_CITY_CITIZEN_GROWTH") .. 
+			"[NEWLINE]" ..
+			GetColorPercentString(iYieldPercent) .. 
+			" "..
+			Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_ALL_YIELDS") );
+		HappinessTooltipString = HappinessTooltipString.."[NEWLINE][NEWLINE]"..growthInfo.."[NEWLINE]---------------------";
+	end
+	
+	local tableChanges = {};
+	tableChanges["Neg"] = {}
+	tableChanges["Pos"] = {};
+	
+	function repeatAvoidAddNew( TextKey, dataID, isNegative, special)
+		local textValue = Locale.Lookup(TextKey);
+		local AmenityAmount;
+		
+		if (isNegative) then
+			if special then
+				AmenityAmount = Locale.ToNumber(data[dataID]);
+				table.insert(tableChanges["Neg"], {Amenities = AmenityAmount, AmenityType = textValue});
+			elseif (data["AmenitiesLostFrom"..dataID] == 0) then
+			else
+				AmenityAmount = Locale.ToNumber(data["AmenitiesLostFrom"..dataID]);
+				table.insert(tableChanges["Neg"], {Amenities = AmenityAmount, AmenityType = textValue});
+			end
+		else
+			if( data["AmenitiesFrom"..dataID] > 0) then 
+				AmenityAmount = Locale.ToNumber(data["AmenitiesFrom"..dataID])
+				--HappinessTooltipString = HappinessTooltipString.."[NEWLINE]+"..AmenityAmount.." "..textValue:sub(1, -2).." ";
+				table.insert(tableChanges["Pos"], {Amenities = AmenityAmount, AmenityType = textValue});
+			end
+		end
+	end
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_FROM_LUXURIES", 			"Luxuries" 							);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_FROM_CIVICS", 			"Civics" 							);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_FROM_ENTERTAINMENT", 		"Entertainment" 					);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_FROM_GREAT_PEOPLE", 		"GreatPeople"						);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_FROM_RELIGION", 			"Religion"							);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_FROM_NATIONAL_PARKS", 	"NationalParks" 					);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_FROM_STARTING_ERA", 		"StartingEra" 						);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_LOST_FROM_WAR_WEARINESS", "WarWeariness", 		true		);
+	repeatAvoidAddNew("LOC_HUD_CITY_AMENITIES_LOST_FROM_BANKRUPTCY",	"Bankruptcy", 			true 		);
+	repeatAvoidAddNew("Amenities from Population:", 					"AmenitiesRequiredNum", true, true	);
+	function AmenitiesSort(a, b)
+		return a["Amenities"] > b["Amenities"];
+	end
+	table.sort(tableChanges["Neg"], AmenitiesSort);
+	table.sort(tableChanges["Pos"], AmenitiesSort);
+	
+	for _, aTable in pairs(tableChanges["Neg"])do
+		HappinessTooltipString = HappinessTooltipString.."[NEWLINE]-"..aTable.Amenities.." "..aTable.AmenityType:sub(1, -2).."";
+	end
+	HappinessTooltipString = HappinessTooltipString.."[NEWLINE]"
+	for _, aTable in pairs(tableChanges["Pos"])do
+		HappinessTooltipString = HappinessTooltipString.."[NEWLINE]+"..aTable.Amenities.." "..aTable.AmenityType:sub(1, -2).."";
+	end
+	
+	Controls.AmenitiesGrid:SetToolTipString(HappinessTooltipString);
+	
 	Controls.ReligionNum:SetText( data.ReligionFollowers );
 
 	Controls.HousingNum:SetText( data.Population );
 	colorName = GetPercentGrowthColor( data.HousingMultiplier );
 	Controls.HousingNum:SetColorByName( colorName );
 	Controls.HousingMax:SetText( data.Housing );	
-
+	
+	if data.HousingMultiplier == 0 then
+		Controls.HousingGrid:SetToolTipString(Locale.Lookup("LOC_HUD_CITY_POPULATION_GROWTH_HALTED"));
+	elseif data.HousingMultiplier <= 0.25 then
+	    local iPercent = (1 - data.HousingMultiplier) * 100;
+		Controls.HousingGrid:SetToolTipString(Locale.Lookup("LOC_HUD_CITY_POPULATION_GROWTH_SLOWED", iPercent));
+	elseif data.HousingMultiplier <= 0.5 then
+	    local iPercent = (1 - data.HousingMultiplier) * 100;
+		Controls.HousingGrid:SetToolTipString(Locale.Lookup("LOC_HUD_CITY_POPULATION_GROWTH_SLOWED", iPercent));
+	else
+		Controls.HousingGrid:SetToolTipString(Locale.Lookup("LOC_HUD_CITY_POPULATION_GROWTH_NORMAL"));
+	end	
+	
+	--data.CurrentProdPercent
+	--data.ProdPercentNextTurn
+	--data.CurrentProductionStats
+	
+	
+	local buildQueue	= selectedCity:GetBuildQueue();
+	local currentProductionHash 	= buildQueue:GetCurrentProductionTypeHash();
+	local previousProductionHash 	= buildQueue:GetPreviousProductionTypeHash();
+	local productionHash = 0;
+	
+	if( currentProductionHash == 0 ) then
+		productionHash = previousProductionHash;
+	else
+		productionHash = currentProductionHash;
+	end
+	local currentProductionInfo				:table = GetProductionInfoOfCity( data.City, productionHash );
+	
+	--[[
+	local percentThisTurn = currentProductionInfo.PercentCompleteNextTurn-currentProductionInfo.PercentComplete;
+	local retStuff = "";
+	for k, v in pairs(currentProductionInfo) do
+		retStuff = retStuff..""..k.." : "..v.."[NEWLINE]";
+	end
+	retStuff = retStuff.."---------------------[NEWLINE]Percent Difference : "..percentThisTurn;
+	
+	local productionThisTurn = percentThisTurn*currentProductionInfo.Cost;
+	retStuff = retStuff.."[NEWLINE]PD times total : "..productionThisTurn
+	local totalProduction = percentThisTurn*currentProductionInfo.Turns;
+	retStuff = retStuff.."[NEWLINE]PD times turns : "..totalProduction
+	for k,v in pairs(m_pPlayer) do
+		retStuff = retStuff.."[NEWLINE]"..k.." : "..type(v)
+	end
+	retStuff = retStuff.."[NEWLINE]".."Some bullshit: "
+	Controls.HousingGrid:SetToolTipString(retStuff);
+	]]--
+	
+	
+	
 	Controls.BreakdownLabel:SetHide( m_isShowingPanels );
 	Controls.ReligionLabel:SetHide( m_isShowingPanels );
 	Controls.AmenitiesLabel:SetHide( m_isShowingPanels );
+
 	Controls.HousingLabel:SetHide( m_isShowingPanels );
 	Controls.PanelStackShadow:SetHide( not m_isShowingPanels );
 	Controls.ProductionNowLabel:SetHide( m_isShowingPanels );	
@@ -401,32 +628,54 @@ function ViewMain( data:table )
 	Controls.GrowthTurnsBar:SetShadowPercent( data.FoodPercentNextTurn );	
 	Controls.GrowthTurnsBarSmall:SetPercent( data.CurrentFoodPercent );
 	Controls.GrowthTurnsBarSmall:SetShadowPercent( data.FoodPercentNextTurn );
+	
+	local cCulture = selectedCity:GetCulture();
+	--GetCurrentCulture, GetNextPlot, GetNextPlotCultureCost, GetTourism, GetTurnsUntilExpansion
+	local cultureCurrent = cCulture:GetCurrentCulture();
+	local cultureNeeded = cCulture:GetNextPlotCultureCost()
+	local PercentFill = cultureCurrent/cultureNeeded
+	local PercentShadow = (cultureCurrent+data.CulturePerTurn)/cultureNeeded
+	
+	Controls.ExpansionNum:SetText( math.abs(cCulture:GetTurnsUntilExpansion()) );
+	Controls.ExpansionTurnsBar:SetPercent( PercentFill );
+	Controls.ExpansionTurnsBar:SetShadowPercent( PercentShadow );	
+	
+	Controls.ExpansionTurnsBar:SetToolTipString("TURNS UNTIL EXPANSION".."[NEWLINE][ICON_Culture] "..round(cultureCurrent, 1).."/"..cultureNeeded.." ("..toPlusMinusString(data.CulturePerTurn)..")")
+	
+	
+	--toPlusMinusString(totalFood)
 	Controls.GrowthNum:SetText( math.abs(data.TurnsUntilGrowth) );
 	Controls.GrowthNumSmall:SetText( math.abs(data.TurnsUntilGrowth).."[Icon_Turn]" );
+	
+	local GrowthTurnsBar_toolTip = ""
+	
 	if data.Occupied then
-		Controls.GrowthLabel:SetColorByName("StatBadCS");
-		Controls.GrowthLabel:SetText( Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_GROWTH_OCCUPIED") ) );		
+		Controls.GrowthNum:SetColorByName("StatBadCS");
+		GrowthTurnsBar_toolTip = Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_GROWTH_OCCUPIED") )
 	elseif data.TurnsUntilGrowth >= 0 then
-		Controls.GrowthLabel:SetColorByName("StatGoodCS");
-		local CurFood = Round(data.CurrentFood, 1);
-		local FoodGainNextTurn = Round(data.FoodGainNextTurn, 1);
-		local RequiredFood = data.RequiredFood;
-
-		Controls.GrowthLabel:SetText( "  "..CurFood.." + "..FoodGainNextTurn.." / "..RequiredFood);		
+		Controls.GrowthNum:SetColorByName("StatGoodCS");
+		GrowthTurnsBar_toolTip = Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_TURNS_UNTIL_GROWTH",data.TurnsUntilGrowth))		
 	else
-		Controls.GrowthLabel:SetColorByName("StatBadCS");
-		Controls.GrowthLabel:SetText( Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_TURNS_UNTIL_LOSS", math.abs(data.TurnsUntilGrowth))) );
+		Controls.GrowthNum:SetColorByName("StatBadCS");
+		GrowthTurnsBar_toolTip = Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_TURNS_UNTIL_LOSS", math.abs(data.TurnsUntilGrowth))) 
 	end
-
+	
+	local cGrowth = selectedCity:GetGrowth();
+	
+	Controls.GrowthTurnsBar:SetToolTipString(GrowthTurnsBar_toolTip.."[NEWLINE][ICON_Food] "..round(cGrowth:GetFood(), 1).."/"..cGrowth:GetGrowthThreshold().." ("..toPlusMinusString(totalFood)..")")
+	--Controls.GrowthTurnsBar:SetToolTipString(GrowthTurnsBar_toolTip)
+	
+	
 	widthNumLabel = Controls.GrowthNum:GetSizeX();
 	TruncateStringWithTooltip(Controls.GrowthLabel, MAX_BEFORE_TRUNC_TURN_LABELS-widthNumLabel, Controls.GrowthLabel:GetText());
 
 	--Production
 
-	Controls.ProductionTurns:SetHide( m_isShowingPanels );	
-	Controls.ProductionTurnsBar:SetPercent(data.CurrentProdPercent);
-	Controls.ProductionTurnsBar:SetShadowPercent(data.ProdPercentNextTurn);
-	Controls.ProductionNum:SetText( data.CurrentTurnsLeft );
+	--Controls.ProductionTurns:SetHide( m_isShowingPanels );	
+	Controls.CurrentProductionProgress:SetPercent(data.CurrentProdPercent);
+	Controls.CurrentProductionProgress:SetShadowPercent(data.ProdPercentNextTurn);
+	Controls.CurrentProductionCost:SetText( data.CurrentTurnsLeft );
+	Controls.CurrentProductionProgressString:SetText(currentProductionInfo.Progress.."/"..currentProductionInfo.Cost.." [ICON_ProductionLarge]");
 	Controls.ProductionNowLabel:SetText( data.CurrentProductionName );
 
 	Controls.ProductionDescriptionString:SetText( data.CurrentProductionDescription );
@@ -445,18 +694,19 @@ function ViewMain( data:table )
 		Controls.ProductionIcon:SetHide(true);
 	end
 	
-	Controls.ProductionNum:SetHide( data.CurrentTurnsLeft < 0 );
-
+	Controls.CurrentProductionCost:SetHide( data.CurrentTurnsLeft < 0 );
+	Controls.CurrentProductionProgressString:SetHide( data.CurrentTurnsLeft < 0 );
+	Controls.CurrentProductionCost_Clock:SetHide( data.CurrentTurnsLeft < 0 );
 	if data.CurrentTurnsLeft < 0 then	
 		Controls.ProductionLabel:SetText( Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_NOTHING_PRODUCED")) );
 		widthNumLabel = 0;
 	else
-		Controls.ProductionLabel:SetText( data.ProductionProgress .. " / " .. data.ProductionCost );
-		widthNumLabel = Controls.ProductionNum:GetSizeX();
+		--Controls.ProductionLabel:SetText( Locale.ToUpper( Locale.Lookup("LOC_HUD_CITY_TURNS_UNTIL_COMPLETED", data.CurrentTurnsLeft)) );
+		--widthNumLabel = Controls.ProductionNum:GetSizeX();
 	end
 
 	TruncateStringWithTooltip(Controls.ProductionLabel, MAX_BEFORE_TRUNC_TURN_LABELS-widthNumLabel, Controls.ProductionLabel:GetText());
-	Controls.ProductionTurnsBar:ReprocessAnchoring();	-- Fixes up children elements inside of the bar.
+	Controls.CurrentProductionProgress:ReprocessAnchoring();	-- Fixes up children elements inside of the bar.
 	
 	-- Tutorial lockdown
 	if m_kTutorialDisabledControls ~= nil then
@@ -776,6 +1026,24 @@ function OnResetYieldToNormal( yieldType:number, yieldName:string )
 	Controls[yieldName.."Ignore"]:SetHide( true );
 	Controls[yieldName.."Check"]:SetDisabled( false );
 	SetYieldIgnore( yieldType );		-- One more ignore to flip it off
+end
+
+-- ===========================================================================
+--	Cycle to the next city
+-- ===========================================================================
+function OnNextCity()
+	local kCity:table = UI.GetHeadSelectedCity();
+	UI.SelectNextCity(kCity);
+	UI.PlaySound("UI_Click_Sweetener_Metal_Button_Small");
+end
+
+-- ===========================================================================
+--	Cycle to the previous city
+-- ===========================================================================
+function OnPreviousCity()
+	local kCity:table = UI.GetHeadSelectedCity();
+	UI.SelectPrevCity(kCity);
+	UI.PlaySound("UI_Click_Sweetener_Metal_Button_Small");
 end
 
 -- ===========================================================================

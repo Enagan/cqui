@@ -91,6 +91,10 @@
 
 ![](http://i.imgur.com/PUwoxz3.png)
 
+### Divine Yuri's City Panel
+
+http://forums.civfanatics.com/resources/divine-yuris-custom-city-panel.25430/
+
 # How to use
 * Download the latest release from
 https://github.com/chaorace/cqui/releases/
@@ -118,7 +122,7 @@ Contents/Assets/DLC
 
 * Visit https://github.com/chaorace/cqui occasionally or follow https://twitter.com/realchaorace to be the first to know about new releases and feature additions!
 
-* NOTE: Until this mod is in a less experimental state, the mod will not remember its "enabled" status after restarting the game. This means that every time you plan to start a new game using CQUI, you'll need to explicitly enable it in the "Additional Content" menu first. Once you've created the game using the mod, it will always load when you start the save, regardless of its current status in the "Additional Content Menu" 
+* NOTE: Until this mod is in a less experimental state, the mod will not remember its "enabled" status after restarting the game. This means that every time you plan to start a new game using CQUI, you'll need to explicitly enable it in the "Additional Content" menu first. Once you've created the game using the mod, it will always load when you start the save, regardless of its current status in the "Additional Content Menu"
 
 ### KNOWN ISSUES / SUPPORT:
 

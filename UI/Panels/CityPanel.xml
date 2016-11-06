@@ -33,11 +33,19 @@
               <TextureBar		ID="GrowthTurnsBarSmall"	Anchor="L,T" Offset="2,2"			Size="parent-4,parent-3"		Texture="CityPanel_CitizenMeterSmall"		ShadowColor="255,255,255,100" />
               <Label				ID="GrowthNumSmall"				Anchor="C,C" Style="CityPanelNumLarge" WrapWidth="70" String="999"  />
             </Image>
-            <Image					ID="GrowthTurns"					Anchor="L,B" Offset="82,-4"		Size="182,21"								Texture="CityPanel_MeterBacking" >
-              <TextureBar		ID="GrowthTurnsBar"				Anchor="L,T" Offset="2,2"			Size="parent-4,parent-3"		Texture="CityPanel_CitizenMeter"				ShadowColor="255,255,255,100" >
-                <Stack																Anchor="L,C" Offset="5,0"			StackGrowth="Right" StackPadding="2" >
-                  <Label		ID="GrowthNum"						Style="CityPanelNumLarge"			String="-"  />
-                  <Label		ID="GrowthLabel"					Style="CityPanelProgressText" String="n/a"  ColorSet="GrowthCS" 	/>
+            <Image					ID="GrowthTurns"					Anchor="L,B" Offset="92,-4"		Size="71,21"								Texture="CityPanel_MeterSmallBacking" >
+              <TextureBar		ID="GrowthTurnsBar"				Anchor="L,T" Offset="2,2"			Size="parent-4,parent-3"		Texture="CityPanel_CitizenMeterSmall"				ShadowColor="255,255,255,100" >
+                <Stack																Anchor="C,C" Offset="0,0"			StackGrowth="Right" StackPadding="2" >
+                  <Label		ID="GrowthNum"						Style="CityPanelNumLarge"			WrapWidth="70" String="999"  />
+					<!-- <Label		ID="GrowthNum_Clock"		Style="CityPanelNumLarge" String="[ICON_Turn]" Offset="-4,-2"/>-->
+                  <Label		ID="GrowthLabel"					Style="CityPanelProgressText" String="n/a"  ColorSet="GrowthCS" Hidden="1"	/>
+                </Stack>
+              </TextureBar>
+            </Image>
+			<Image					ID="ExpansionTurns"					Anchor="R,B" Offset="14,-4"		Size="71,21"								Texture="CityPanel_MeterSmallBacking" >
+              <TextureBar		ID="ExpansionTurnsBar"				Anchor="L,T" Offset="2,2"	Color="255,100,190,255"		Size="parent-4,parent-3"		Texture="CityPanel_ProductionMeterSmall"				ShadowColor="255,100,190,100" >
+                <Stack																Anchor="C,C" Offset="0,0"			StackExpansion="Left" StackPadding="2" >
+                  <Label		ID="ExpansionNum"						Style="CityPanelNumLarge"	 String="-"  />
                 </Stack>
               </TextureBar>
             </Image>
@@ -93,11 +101,13 @@
             <Image					ID="ProductionIcon"				Anchor="C,C" Offset="0,-2"  Size="80,80"    						Texture="Buildings80" Hidden="1"/>
           </Image>
           <Image						ID="ProductionTurns"			Anchor="R,B" Offset="55,-24"	Size="182,21"							Texture="CityPanel_MeterBacking">
-            <TextureBar			ID="ProductionTurnsBar"		Anchor="L,T" Offset="2,2"			Size="parent-4,parent-3"	Texture="CityPanel_ProductionMeter"				ShadowColor="255,255,255,150">
+            <TextureBar			ID="CurrentProductionProgress"		Anchor="L,T" Offset="2,2"			Size="parent-4,parent-3"	Texture="CityPanel_ProductionMeter"				ShadowColor="255,255,255,150">
               <Stack																	Anchor="L,C" Offset="5,0"			StackGrowth="Right"	StackPadding="4">
-                <Label			ID="ProductionNum"				Style="CityPanelNumLarge"			String="-"  />
-                <Label			ID="ProductionLabel"			Style="CityPanelProgressText" String="n/a"  ColorSet="ResProductionLabelCS" 	/>
+                <Label			ID="CurrentProductionCost"				Style="CityPanelNumLarge"			String="-"  />
+				<Label			ID="CurrentProductionCost_Clock"		Style="CityPanelNumLarge" String="[ICON_Turn]" Offset="-4,-2"/>
+                <Label			ID="ProductionLabel"			Style="CityPanelProgressText" String="n/a"  ColorSet="ResProductionLabelCS" 	Hidden="1"/>
               </Stack>
+			  <Label				ID="CurrentProductionProgressString"				String="[ICON_Production]XX/XXX" Style="WhiteSemiBold14" Color0="172,173,168" Anchor="R,B" Offset="0,0"/>
             </TextureBar>
           </Image>
         </Image>
@@ -141,8 +151,8 @@
           <Button						ID="NextCityButton"				Anchor="R,T" Offset="4,2" 		Style="ArrowButtonRight" />
         </Grid>
 
-        <Stack StackGrowth="Right" Padding="3" Anchor="C,T" Hidden="1">
-          <Grid																	Anchor="C,T" Offset="-120,-68"		Size="100,41"				Texture="UnitPanel_ActionGroupSlot"  SliceCorner="5,19" SliceSize="1,1" InnerPadding="10,-16" AutoSize="H">
+        <Stack StackGrowth="Right" Padding="3" Anchor="C,T">
+          <Grid																	Anchor="C,T" Offset="0,-68"		Size="100,41"				Texture="UnitPanel_ActionGroupSlot"  SliceCorner="5,19" SliceSize="1,1" InnerPadding="10,-16" AutoSize="H">
             <CheckBox				ID="ToggleOverviewPanel"	Offset="0,-2"	Size="44,53"  ButtonTexture="UnitPanel_ActionButton"	ButtonSize="44,53" CheckTexture="CityPanel_ActionTogglePanel"    CheckTextureOffset="0,32"		CheckSize="32,32" CheckOffset="5,8"	UnCheckTexture="CityPanel_ActionTogglePanel"	  UnCheckSize="32,32" UnCheckOffset="5,8" UseSelectedTextures="1" ToolTip="LOC_HUD_CITY_TOGGLE_OVERVIEW" IsChecked="0"/>
           </Grid>
           <Grid																	Anchor="C,T" Offset="-50,-68"		Size="100,41"				Texture="UnitPanel_ActionGroupSlot"  SliceCorner="5,19" SliceSize="1,1" InnerPadding="10,-16" AutoSize="H">
