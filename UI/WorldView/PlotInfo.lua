@@ -292,12 +292,12 @@ function ShowCitizens()
         --CQUI Citizen buttons tweaks
 				if(tUnits[i] >= 1) then
 					pInstance.CitizenButton:SetTextureOffsetVal(0, CITIZEN_BUTTON_HEIGHT*4);
-					pInstance.CitizenButton:SetSizeVal(80,80);
-          pInstance.CitizenButton:SetAlpha(.35);
+					pInstance.CitizenButton:SetSizeVal(46,46);
+          pInstance.CitizenButton:SetAlpha(1.0);
 				else
 					pInstance.CitizenButton:SetTextureOffsetVal(0, 0);
-          pInstance.CitizenButton:SetSizeVal(64,64);
-          pInstance.CitizenButton:SetAlpha(.5);
+          pInstance.CitizenButton:SetSizeVal(46,46);
+          pInstance.CitizenButton:SetAlpha(1.0);
 				end
 
 				if(tMaxUnits[i] > 1) then
